@@ -76,7 +76,7 @@ Generate exactly ${weekCount} weeks.
           "X-Title": "PathAI",
         },
         body: JSON.stringify({
-          model: 'meta-llama/llama-3-8b-instruct',
+         model: 'openai/gpt-4o-mini',
           messages: [{ role: "user", content: prompt }],
         }),
       }
