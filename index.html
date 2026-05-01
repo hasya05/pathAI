@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PathAI — Where do you want to go?</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --midnight: #05050f;
+    --deep-blue: #080820;
+    --violet: #1a0a3a;
+    --soft-violet: #2d1060;
+    --gold: #c9a84c;
+    --gold-glow: rgba(201,168,76,0.15);
+    --off-white: #e8e4f0;
+    --muted: rgba(232,228,240,0.55);
+    --glass: rgba(255,255,255,0.04);
+    --glass-border: rgba(255,255,255,0.08);
+  }
+
+  html { scroll-behavior: smooth; overflow-x: hidden; }
+
+  body {
+    background: var(--midnight);
+    color: var(--off-white);
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 300;
+    overflow-x: hidden;
+    cursor: default;
+  }
+
+  /* ─── GRAIN OVERLAY ─── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 1000; pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.045'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 180px;
+    mix-blend-mode: overlay;
+    opacity: 0.6;
+  }
+
+  /* ─── STAR CANVAS ─── */
+  #star-canvas {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  }
+
+  /* ─── AMBIENT GRADIENT ─── */
+  .ambient {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background: radial-gradient(ellipse 80% 60% at 50% 10%, rgba(42,12,90,0.5) 0%, transparent 70%),
+                radial-gradient(ellipse 60% 40% at 80% 80%, rgba(8,20,60,0.4) 0%, transparent 70%),
+                radial-gradient(ellipse 70% 50% at 20% 60%, rgba(20,5,50,0.3) 0%, transparent 70%);
+    transition: background 2s ease;
+  }
+
+  /* ─── SECTIONS ─── */
+  section { position: relative; z-index: 2; }
+
+  /* ─── HERO ─── */
+  #hero {
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center; flex-direction: column;
+    text-align: center;
+    padding: 2rem;
+    transition: opacity 0.8s ease, transform 0.8s ease;
+  }
+
+  #hero.fade-out { opacity: 0; transform: translateY(-60px); }
+
+  .hero-eyebrow {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.7rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--gold);
+    opacity: 0;
+    animation: fadeUp 1.2s ease 0.3s forwards;
+    margin-bottom: 2.5rem;
+  }
+
+  .hero-headline {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(3.5rem, 10vw, 8rem);
+    font-weight: 300;
+    line-height: 1.05;
+    letter-spacing: -0.01em;
+    opacity: 0;
+    animation: fadeUp 1.4s ease 0.5s forwards;
+    margin-bottom: 1.8rem;
+  }
+
+  .hero-headline em {
+    font-style: italic;
+    color: rgba(232,228,240,0.7);
+  }
+
+  .hero-sub {
+    font-family: 'DM Sans', sans-serif;
+    font-size: clamp(0.9rem, 2vw, 1.05rem);
+    color: var(--muted);
+    letter-spacing: 0.04em;
+    line-height: 1.8;
+    max-width: 420px;
+    opacity: 0;
+    animation: fadeUp 1.4s ease 0.8s forwards;
+    margin-bottom: 3.5rem;
+  }
+
+  .btn-primary {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.8rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--gold);
+    background: transparent;
+    border: 1px solid rgba(201,168,76,0.3);
+    padding: 1rem 2.8rem;
+    cursor: pointer;
+    border-radius: 2px;
+    opacity: 0;
+    animation: fadeUp 1.4s ease 1.1s forwards;
+    transition: all 0.5s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-primary::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at center, rgba(201,168,76,0.12) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+
+  .btn-primary:hover { border-color: rgba(201,168,76,0.6); box-shadow: 0 0 30px rgba(201,168,76,0.12); transform: scale(1.02); }
+  .btn-primary:hover::before { opacity: 1; }
+
+  .scroll-hint {
+    position: absolute; bottom: 2rem; left: 50%; transform: translateX(-50%);
+    opacity: 0; animation: fadeIn 1s ease 2s forwards;
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+  }
+
+  .scroll-hint span { font-size: 0.65rem; letter-spacing: 0.2em; color: var(--muted); text-transform: uppercase; }
+  .scroll-line { width: 1px; height: 40px; background: linear-gradient(to bottom, var(--gold), transparent); animation: scrollPulse 2s ease-in-out infinite; }
+
+  /* ─── INPUT JOURNEY ─── */
+  #journey {
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    padding: 4rem 2rem;
+  }
+
+  .journey-inner {
+    width: 100%; max-width: 640px;
+    display: flex; flex-direction: column; gap: 0;
+  }
+
+  .step {
+    opacity: 0; transform: translateY(30px);
+    transition: opacity 0.8s ease, transform 0.8s ease;
+    margin-bottom: 3rem;
+  }
+
+  .step.visible { opacity: 1; transform: translateY(0); }
+  .step.dimmed { opacity: 0.35; }
+
+  .step-label {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(2rem, 5vw, 3.2rem);
+    font-weight: 300;
+    line-height: 1.2;
+    margin-bottom: 1.4rem;
+    color: var(--off-white);
+  }
+
+  .step-label em { font-style: italic; color: rgba(201,168,76,0.85); }
+
+  .journey-input {
+    width: 100%;
+    background: var(--glass);
+    border: none;
+    border-bottom: 1px solid var(--glass-border);
+    color: var(--off-white);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1rem;
+    font-weight: 300;
+    padding: 0.9rem 0;
+    outline: none;
+    transition: border-color 0.4s ease;
+    letter-spacing: 0.02em;
+  }
+
+  .journey-input::placeholder { color: rgba(232,228,240,0.25); }
+  .journey-input:focus { border-bottom-color: rgba(201,168,76,0.5); }
+
+  .duration-options {
+    display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 0.5rem;
+  }
+
+  .dur-btn {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.75rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid var(--glass-border);
+    padding: 0.5rem 1.2rem;
+    cursor: pointer;
+    border-radius: 1px;
+    transition: all 0.3s ease;
+  }
+
+  .dur-btn:hover, .dur-btn.selected {
+    color: var(--gold);
+    border-color: rgba(201,168,76,0.4);
+    background: var(--gold-glow);
+  }
+
+  .map-btn {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.78rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--midnight);
+    background: var(--gold);
+    border: none;
+    padding: 1.1rem 3rem;
+    cursor: pointer;
+    margin-top: 2rem;
+    opacity: 0; pointer-events: none;
+    transition: all 0.6s ease;
+    transform: translateY(10px);
+    border-radius: 1px;
+    align-self: flex-start;
+  }
+
+  .map-btn.visible { opacity: 1; pointer-events: all; transform: translateY(0); }
+  .map-btn:hover { box-shadow: 0 0 40px rgba(201,168,76,0.25); transform: scale(1.02); }
+
+  /* ─── LOADING ─── */
+  #loading {
+    position: fixed; inset: 0; z-index: 900;
+    background: rgba(5,5,15,0.97);
+    display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 1.5rem;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.6s ease;
+  }
+
+  #loading.active { opacity: 1; pointer-events: all; }
+
+  .loading-text {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.4rem;
+    font-weight: 300;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    transition: opacity 0.5s ease;
+  }
+
+  .loading-orb {
+    width: 60px; height: 60px;
+    border-radius: 50%;
+    border: 1px solid rgba(201,168,76,0.2);
+    position: relative;
+    animation: orbPulse 2s ease-in-out infinite;
+  }
+
+  .loading-orb::before {
+    content: '';
+    position: absolute; inset: 8px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(201,168,76,0.3), transparent);
+    animation: orbPulse 2s ease-in-out infinite reverse;
+  }
+
+  /* ─── ROADMAP ─── */
+  #roadmap {
+    min-height: 100vh;
+    padding: 8rem 2rem;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  #roadmap.visible { display: flex; }
+
+  .roadmap-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 300;
+    text-align: center;
+    margin-bottom: 1rem;
+  }
+
+  .roadmap-sub {
+    color: var(--muted);
+    font-size: 0.9rem;
+    letter-spacing: 0.08em;
+    text-align: center;
+    margin-bottom: 6rem;
+  }
+
+  .path-container {
+    width: 100%; max-width: 740px;
+    position: relative;
+  }
+
+  .path-line {
+    position: absolute;
+    left: 50%; transform: translateX(-50%);
+    top: 0; bottom: 0;
+    width: 1px;
+    background: linear-gradient(to bottom,
+      transparent 0%,
+      rgba(201,168,76,0.12) 5%,
+      rgba(201,168,76,0.25) 50%,
+      rgba(201,168,76,0.08) 95%,
+      transparent 100%
+    );
+    z-index: 0;
+  }
+
+  .week-node {
+    display: flex;
+    align-items: flex-start;
+    gap: 2.5rem;
+    margin-bottom: 4rem;
+    opacity: 0; transform: translateY(40px);
+    transition: opacity 0.8s ease, transform 0.8s ease;
+    position: relative; z-index: 1;
+  }
+
+  .week-node.visible { opacity: 1; transform: translateY(0); }
+  .week-node:nth-child(even) { flex-direction: row-reverse; }
+
+  .node-dot {
+    flex-shrink: 0;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--gold);
+    box-shadow: 0 0 20px rgba(201,168,76,0.4), 0 0 40px rgba(201,168,76,0.15);
+    margin-top: 1.4rem;
+    position: relative;
+    align-self: flex-start;
+  }
+
+  .node-dot::before {
+    content: '';
+    position: absolute; inset: -6px;
+    border-radius: 50%;
+    border: 1px solid rgba(201,168,76,0.2);
+    animation: nodePulse 3s ease-in-out infinite;
+  }
+
+  .week-card {
+    flex: 1;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.07);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 2px;
+    padding: 2rem 2.2rem;
+    transition: all 0.4s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .week-card::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at top left, rgba(201,168,76,0.04) 0%, transparent 60%);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+
+  .week-card:hover {
+    border-color: rgba(201,168,76,0.18);
+    box-shadow: 0 0 50px rgba(201,168,76,0.06), 0 20px 60px rgba(0,0,0,0.3);
+    transform: translateY(-2px);
+  }
+
+  .week-card:hover::before { opacity: 1; }
+
+  .week-label {
+    font-size: 0.62rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 0.6rem;
+    font-weight: 400;
+  }
+
+  .week-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.5rem;
+    font-weight: 400;
+    margin-bottom: 0.8rem;
+    line-height: 1.2;
+  }
+
+  .week-focus {
+    font-size: 0.82rem;
+    color: var(--muted);
+    line-height: 1.7;
+    margin-bottom: 1.4rem;
+    border-left: 1px solid rgba(201,168,76,0.2);
+    padding-left: 1rem;
+    font-style: italic;
+  }
+
+  .steps-label {
+    font-size: 0.6rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(232,228,240,0.35);
+    margin-bottom: 0.6rem;
+  }
+
+  .steps-list {
+    list-style: none;
+    margin-bottom: 1.2rem;
+  }
+
+  .steps-list li {
+    font-size: 0.82rem;
+    color: rgba(232,228,240,0.7);
+    padding: 0.3rem 0;
+    display: flex; gap: 0.6rem; align-items: baseline;
+    line-height: 1.5;
+  }
+
+  .steps-list li::before {
+    content: '→';
+    color: var(--gold);
+    flex-shrink: 0;
+    font-size: 0.7rem;
+  }
+
+  .tools-list {
+    display: flex; flex-wrap: wrap; gap: 0.4rem;
+  }
+
+  .tool-tag {
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    color: rgba(232,228,240,0.5);
+    border: 1px solid rgba(255,255,255,0.08);
+    padding: 0.25rem 0.7rem;
+    border-radius: 1px;
+  }
+
+  /* ─── FLOATING WISDOM ─── */
+  .wisdom {
+    text-align: center;
+    padding: 5rem 2rem;
+    opacity: 0; transform: translateY(20px);
+    transition: opacity 1s ease, transform 1s ease;
+  }
+
+  .wisdom.visible { opacity: 1; transform: translateY(0); }
+
+  .wisdom p {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(1.2rem, 3vw, 1.8rem);
+    font-weight: 300;
+    font-style: italic;
+    color: rgba(232,228,240,0.3);
+    letter-spacing: 0.04em;
+  }
+
+  /* ─── FEATURES ─── */
+  #features {
+    padding: 6rem 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2.5rem;
+  }
+
+  .feature-line {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(1.4rem, 3.5vw, 2.2rem);
+    font-weight: 300;
+    color: rgba(232,228,240,0.2);
+    letter-spacing: 0.04em;
+    text-align: center;
+    opacity: 0; transform: translateY(15px);
+    transition: opacity 0.9s ease, transform 0.9s ease, color 0.9s ease;
+  }
+
+  .feature-line.visible { opacity: 1; transform: translateY(0); color: rgba(232,228,240,0.55); }
+
+  /* ─── END ─── */
+  #end {
+    min-height: 60vh;
+    display: flex; align-items: center; justify-content: center; flex-direction: column;
+    text-align: center; padding: 4rem 2rem;
+    gap: 2rem;
+  }
+
+  .end-text {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(2.5rem, 7vw, 5rem);
+    font-weight: 300;
+    line-height: 1.1;
+    opacity: 0; transform: translateY(20px);
+    transition: opacity 1s ease, transform 1s ease;
+  }
+
+  .end-text.visible { opacity: 1; transform: translateY(0); }
+
+  .restart-btn {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.72rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid var(--glass-border);
+    padding: 0.8rem 2rem;
+    cursor: pointer;
+    border-radius: 1px;
+    opacity: 0; transform: translateY(10px);
+    transition: all 0.4s ease;
+    transition-delay: 0.4s;
+  }
+
+  /* ─── FOOTER ─── */
+.footer {
+  padding: 4rem 2rem 3rem;
+  text-align: center;
+  position: relative;
+  z-index: 2;
+}
+
+.footer-line {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.2rem;
+  font-weight: 300;
+  font-style: italic;
+  color: rgba(232,228,240,0.35);
+  letter-spacing: 0.04em;
+  margin-bottom: 0.8rem;
+}
+
+.footer-sub {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: rgba(232,228,240,0.25);
+}
+
+  .restart-btn.visible { opacity: 1; transform: translateY(0); }
+  .restart-btn:hover { color: var(--gold); border-color: rgba(201,168,76,0.3); }
+
+  /* ─── ANIMATIONS ─── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  @keyframes scrollPulse {
+    0%, 100% { transform: scaleY(1); opacity: 0.5; }
+    50% { transform: scaleY(0.7); opacity: 1; }
+  }
+
+  @keyframes orbPulse {
+    0%, 100% { transform: scale(1); opacity: 0.6; }
+    50% { transform: scale(1.15); opacity: 1; }
+  }
+
+  @keyframes nodePulse {
+    0%, 100% { transform: scale(1); opacity: 0.4; }
+    50% { transform: scale(1.6); opacity: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="ambient" id="ambient"></div>
+<canvas id="star-canvas"></canvas>
+
+<!-- HERO -->
+<section id="hero">
+  <p class="hero-eyebrow">PathAI &nbsp;·&nbsp; Your Personal Journey</p>
+  <h1 class="hero-headline">Where do you<br><em>want to go?</em></h1>
+  <p class="hero-sub">Not all journeys are mapped.<br>This one will be.</p>
+  <button class="btn-primary" onclick="beginJourney()">Begin the Journey</button>
+  <div class="scroll-hint">
+    <span>Scroll</span>
+    <div class="scroll-line"></div>
+  </div>
+</section>
+
+<!-- WISDOM 1 -->
+<div class="wisdom" id="w1">
+  <p>"Every path begins quietly."</p>
+</div>
+
+<!-- JOURNEY INPUT -->
+<section id="journey">
+  <div class="journey-inner">
+    <div class="step" id="step1">
+      <p class="step-label">Where are you <em>now?</em></p>
+      <input class="journey-input" id="inp1" type="text" placeholder="Your current role, skill, or place in life…" oninput="checkStep1()">
+    </div>
+    <div class="step" id="step2">
+      <p class="step-label">Where do you <em>want to go?</em></p>
+      <input class="journey-input" id="inp2" type="text" placeholder="Your dream destination, goal, or aspiration…" oninput="checkStep2()">
+    </div>
+    <div class="step" id="step3">
+      <p class="step-label">How long is your <em>journey?</em></p>
+      <div class="duration-options">
+        <button class="dur-btn" onclick="selectDur(this,'4 weeks')">4 Weeks</button>
+        <button class="dur-btn" onclick="selectDur(this,'8 weeks')">8 Weeks</button>
+        <button class="dur-btn" onclick="selectDur(this,'12 weeks')">12 Weeks</button>
+        <button class="dur-btn" onclick="selectDur(this,'6 months')">6 Months</button>
+      </div>
+    </div>
+    <button class="map-btn" id="mapBtn" onclick="generateRoadmap()">Map My Journey</button>
+  </div>
+</section>
+
+<!-- LOADING -->
+<div id="loading">
+  <div class="loading-orb"></div>
+  <p class="loading-text" id="loadingText">Mapping your path…</p>
+</div>
+
+<!-- WISDOM 2 -->
+<div class="wisdom" id="w2">
+  <p>"You're closer than you think."</p>
+</div>
+
+<!-- ROADMAP -->
+<section id="roadmap">
+  <h2 class="roadmap-title">Your <em>Path</em></h2>
+  <p class="roadmap-sub" id="roadmapSub">A journey tailored to where you are and where you're going.</p>
+  <div class="path-container" id="pathContainer">
+    <div class="path-line"></div>
+  </div>
+</section>
+
+<!-- WISDOM 3 -->
+<div class="wisdom" id="w3">
+  <p>"Small steps shape big futures."</p>
+</div>
+
+<!-- FEATURES -->
+<section id="features">
+  <p class="feature-line" id="f1">Personalized to you</p>
+  <p class="feature-line" id="f2">Built for your pace</p>
+  <p class="feature-line" id="f3">Guided by intelligence</p>
+</section>
+
+<!-- END -->
+<section id="end">
+  <h2 class="end-text" id="endText">This is just<br><em>the beginning.</em></h2>
+  <button class="restart-btn" id="restartBtn" onclick="restart()">Start Again</button>
+</section>
+
+<footer class="footer">
+  <p class="footer-line">You were never lost — only becoming.</p>
+  <p class="footer-sub">— crafted quietly by Hasya <3 </p>
+</footer>
+
+<script>
+// ─── STARS ───
+const canvas = document.getElementById('star-canvas');
+const ctx = canvas.getContext('2d');
+let stars = [], W, H;
+
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+
+function initStars() {
+  stars = [];
+  for (let i = 0; i < 180; i++) {
+    stars.push({
+      x: Math.random() * W,
+      y: Math.random() * H,
+      r: Math.random() * 1.2 + 0.2,
+      vx: (Math.random() - 0.5) * 0.08,
+      vy: (Math.random() - 0.5) * 0.06,
+      o: Math.random() * 0.5 + 0.15,
+      pulse: Math.random() * Math.PI * 2,
+      speed: Math.random() * 0.02 + 0.005
+    });
+  }
+}
+
+function drawStars() {
+  ctx.clearRect(0, 0, W, H);
+  const t = Date.now() * 0.001;
+  stars.forEach(s => {
+    s.x += s.vx; s.y += s.vy;
+    if (s.x < 0) s.x = W; if (s.x > W) s.x = 0;
+    if (s.y < 0) s.y = H; if (s.y > H) s.y = 0;
+    const o = s.o * (0.6 + 0.4 * Math.sin(t * s.speed * 60 + s.pulse));
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(210,200,240,${o})`;
+    ctx.fill();
+  });
+  requestAnimationFrame(drawStars);
+}
+
+resize(); initStars(); drawStars();
+window.addEventListener('resize', () => { resize(); initStars(); });
+
+// ─── AMBIENT SHIFT ───
+let scrollY = 0;
+window.addEventListener('scroll', () => {
+  scrollY = window.scrollY;
+  checkVisibility();
+  const pct = scrollY / (document.body.scrollHeight - window.innerHeight);
+  document.getElementById('ambient').style.background =
+    `radial-gradient(ellipse 80% 60% at ${50 + pct * 20}% ${10 + pct * 30}%, rgba(42,12,${90 + pct*40},0.5) 0%, transparent 70%),
+     radial-gradient(ellipse 60% 40% at 80% 80%, rgba(8,${20 + pct*20},60,0.4) 0%, transparent 70%),
+     radial-gradient(ellipse 70% 50% at 20% 60%, rgba(20,5,50,0.3) 0%, transparent 70%)`;
+});
+
+// ─── VISIBILITY ───
+function isVisible(el) {
+  const r = el.getBoundingClientRect();
+  return r.top < window.innerHeight * 0.85 && r.bottom > 0;
+}
+
+function checkVisibility() {
+  ['w1','w2','w3'].forEach(id => { const el = document.getElementById(id); if(el && isVisible(el)) el.classList.add('visible'); });
+  ['f1','f2','f3'].forEach((id,i) => { const el = document.getElementById(id); if(el && isVisible(el)) setTimeout(() => el.classList.add('visible'), i * 200); });
+  const et = document.getElementById('endText');
+  const rb = document.getElementById('restartBtn');
+  if(et && isVisible(et)) { et.classList.add('visible'); rb.classList.add('visible'); }
+  document.querySelectorAll('.week-node').forEach((n,i) => { if(isVisible(n)) setTimeout(() => n.classList.add('visible'), i * 120); });
+}
+
+// ─── STEP FLOW ───
+let step1done = false, step2done = false, selectedDur = '';
+
+window.addEventListener('scroll', () => {
+  const j = document.getElementById('journey');
+  if (!j) return;
+  const r = j.getBoundingClientRect();
+  if (r.top < window.innerHeight * 0.7) {
+    document.getElementById('step1').classList.add('visible');
+  }
+});
+
+function checkStep1() {
+  const v = document.getElementById('inp1').value.trim();
+  if (v.length > 2 && !step1done) {
+    step1done = true;
+    setTimeout(() => {
+      document.getElementById('step1').classList.add('dimmed');
+      document.getElementById('step2').classList.add('visible');
+    }, 500);
+  }
+}
+
+function checkStep2() {
+  const v = document.getElementById('inp2').value.trim();
+  if (v.length > 2 && !step2done) {
+    step2done = true;
+    setTimeout(() => {
+      document.getElementById('step2').classList.add('dimmed');
+      document.getElementById('step3').classList.add('visible');
+    }, 500);
+  }
+}
+
+function selectDur(btn, val) {
+  document.querySelectorAll('.dur-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  selectedDur = val;
+  document.getElementById('step3').classList.add('dimmed');
+  document.getElementById('mapBtn').classList.add('visible');
+}
+
+// ─── BEGIN ───
+function beginJourney() {
+  document.getElementById('hero').classList.add('fade-out');
+  setTimeout(() => {
+    window.scrollTo({ top: document.getElementById('journey').offsetTop - 80, behavior: 'smooth' });
+    document.getElementById('step1').classList.add('visible');
+  }, 600);
+}
+
+// ─── GENERATE ROADMAP ───
+const loadingPhrases = [
+  'Mapping your path…',
+  'Tracing possibilities…',
+  'Charting the unseen…',
+  'Weaving your journey…'
+];
+
+async function generateRoadmap() {
+  const from = document.getElementById('inp1').value.trim();
+  const to = document.getElementById('inp2').value.trim();
+  const dur = selectedDur;
+
+  if (!from || !to || !dur) return;
+
+  // Show loading
+  const loading = document.getElementById('loading');
+  const loadingText = document.getElementById('loadingText');
+  loading.classList.add('active');
+
+  let pi = 0;
+  const phraseInterval = setInterval(() => {
+    pi = (pi + 1) % loadingPhrases.length;
+    loadingText.style.opacity = '0';
+    setTimeout(() => { loadingText.textContent = loadingPhrases[pi]; loadingText.style.opacity = '1'; }, 300);
+  }, 2200);
+
+  try {
+    const prompt = `You are a journey architect. Create a cinematic, personal roadmap for someone going from "${from}" to "${to}" over ${dur}.
+
+Return ONLY valid JSON (no markdown, no backticks, no preamble), like this:
+{
+  "subtitle": "A brief poetic sentence about this specific journey (under 20 words)",
+  "weeks": [
+    {
+      "number": 1,
+      "title": "Poetic evocative title for this phase",
+      "focus": "One sentence describing the emotional or practical focus of this week",
+      "steps": ["Concrete action 1", "Concrete action 2", "Concrete action 3"],
+      "tools": ["Tool or resource 1", "Tool or resource 2"]
+    }
+  ]
+}
+
+Generate ${dur.includes('4') ? 4 : dur.includes('8') ? 8 : dur.includes('12') ? 12 : 16} weeks. Make titles poetic and evocative. Steps should be specific and actionable. Keep all text concise.`;
+
+    const response = await fetch("http://localhost:3000/roadmap", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    from,
+    to,
+    dur
+  })
+});
+
+if (!response.ok) {
+  throw new Error("Server error");
+}
+
+const roadmap = await response.json();
+
+    clearInterval(phraseInterval);
+    loading.classList.remove('active');
+
+    displayRoadmap(roadmap, from, to);
+
+  } catch(e) {
+    clearInterval(phraseInterval);
+    loading.classList.remove('active');
+    // Fallback demo
+    displayRoadmap(getDemoRoadmap(from, to, dur), from, to);
+  }
+}
+
+function getDemoRoadmap(from, to, dur) {
+  const weeks = parseInt(dur) || 4;
+  const data = {
+    subtitle: `From ${from} to ${to} — one quiet step at a time.`,
+    weeks: []
+  };
+  const phases = ['The Awakening','The Foundation','The Gathering','The Practice','The Rising','The Deepening','The Turning','The Arrival','The Mastery','The Bloom','The Clarity','The Horizon'];
+  for (let i = 0; i < weeks; i++) {
+    data.weeks.push({
+      number: i + 1,
+      title: phases[i % phases.length],
+      focus: `Building the inner and outer architecture for your next chapter.`,
+      steps: ['Begin with a clear intention', 'Identify your first concrete milestone', 'Connect with one person who has walked this path'],
+      tools: ['Notion', 'Your journal']
+    });
+  }
+  return data;
+}
+
+function displayRoadmap(data, from, to) {
+  document.getElementById('roadmapSub').textContent = data.subtitle;
+  const container = document.getElementById('pathContainer');
+
+  // Clear old nodes
+  container.querySelectorAll('.week-node').forEach(n => n.remove());
+
+  data.weeks.forEach((week, i) => {
+    const node = document.createElement('div');
+    node.className = 'week-node';
+    node.style.transitionDelay = `${i * 0.08}s`;
+
+    const isEven = i % 2 === 1;
+    const card = `
+      <div class="week-card">
+        <p class="week-label">Week ${week.number}</p>
+        <h3 class="week-title">${week.title}</h3>
+        <p class="week-focus">${week.focus}</p>
+        <p class="steps-label">Steps</p>
+        <ul class="steps-list">
+          ${week.steps.map(s => `<li>${s}</li>`).join('')}
+        </ul>
+        <p class="steps-label" style="margin-top:0.8rem">Tools</p>
+        <div class="tools-list">
+          ${week.tools.map(t => `<span class="tool-tag">${t}</span>`).join('')}
+        </div>
+      </div>
+    `;
+
+    const spacer = `<div style="flex:1"></div>`;
+    const dot = `<div class="node-dot"></div>`;
+
+    node.innerHTML = isEven
+      ? card + dot + spacer
+      : spacer + dot + card;
+
+    container.appendChild(node);
+  });
+
+  document.getElementById('roadmap').classList.add('visible');
+  setTimeout(() => {
+    window.scrollTo({ top: document.getElementById('roadmap').offsetTop - 60, behavior: 'smooth' });
+    setTimeout(checkVisibility, 400);
+  }, 100);
+}
+
+// ─── RESTART ───
+function restart() {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  setTimeout(() => {
+    document.getElementById('hero').classList.remove('fade-out');
+    document.getElementById('step1').className = 'step';
+    document.getElementById('step2').className = 'step';
+    document.getElementById('step3').className = 'step';
+    document.getElementById('inp1').value = '';
+    document.getElementById('inp2').value = '';
+    document.querySelectorAll('.dur-btn').forEach(b => b.classList.remove('selected'));
+    document.getElementById('mapBtn').classList.remove('visible');
+    document.getElementById('roadmap').classList.remove('visible');
+    document.querySelectorAll('.wisdom').forEach(w => w.classList.remove('visible'));
+    document.querySelectorAll('.feature-line').forEach(f => f.classList.remove('visible'));
+    document.getElementById('endText').classList.remove('visible');
+    document.getElementById('restartBtn').classList.remove('visible');
+    step1done = false; step2done = false; selectedDur = '';
+  }, 800);
+}
+</script>
+</body>
+</html>
